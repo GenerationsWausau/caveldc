@@ -48,6 +48,11 @@ export default function App() {
     void requestPersistence()
   }, [])
 
+  // Each screen starts at its top rather than wherever the last one was scrolled to.
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [tab])
+
   // Deal today's challenges the first time the app is opened each day.
   useEffect(() => {
     void ensureDay(today)
