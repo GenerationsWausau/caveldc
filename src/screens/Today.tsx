@@ -1,6 +1,6 @@
 import { Check, Flame, Plus, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
-import { AREAS, AREA_BY_ID } from '../areas'
+import { AREAS, areaOf } from '../areas'
 import type { Challenge } from '../challenges'
 import { DayBar } from '../components/DayBar'
 import { swapChallenge, toggleChallenge, toggleHabit, type Habit } from '../db'
@@ -93,7 +93,7 @@ export function Today({ cave, today, onAddHabit, onManageHabits }: Props) {
           <ul className="habit-list">
             {challenges.map((ch) => {
               const done = isDone(ch.id)
-              const area = AREA_BY_ID[ch.area]
+              const area = areaOf(ch.area)
               return (
                 <li key={ch.id} className="row" style={{ '--area': area.color } as React.CSSProperties}>
                   <button className="habit" aria-pressed={done} onClick={() => tapChallenge(ch)}>
@@ -156,7 +156,7 @@ export function Today({ cave, today, onAddHabit, onManageHabits }: Props) {
             {scheduled.map((h) => {
               const done = isDone(h.id)
               const streak = habitStreak(h, cave.doneByHabit.get(h.id) ?? new Set(), today)
-              const area = AREA_BY_ID[h.area]
+              const area = areaOf(h.area)
               return (
                 <li key={h.id} className="row" style={{ '--area': area.color } as React.CSSProperties}>
                   <button className="habit" aria-pressed={done} onClick={() => tapHabit(h)}>

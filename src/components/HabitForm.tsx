@@ -13,7 +13,7 @@ interface Props {
 
 export function HabitForm({ habit, onClose }: Props) {
   const [name, setName] = useState(habit?.name ?? '')
-  const [area, setArea] = useState<AreaId>(habit?.area ?? 'physical')
+  const [area, setArea] = useState<AreaId>(habit?.area ?? 'health')
   const [xp, setXp] = useState(habit?.xp ?? 20)
   const [days, setDays] = useState<number[]>(habit?.days ?? [0, 1, 2, 3, 4, 5, 6])
   const [error, setError] = useState('')

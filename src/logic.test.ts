@@ -17,7 +17,7 @@ import {
 const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6]
 const habit = (over: Partial<HabitLike> = {}): HabitLike => ({
   id: 'h1',
-  area: 'physical',
+  area: 'fitness',
   days: EVERY_DAY,
   startDate: '2026-01-01',
   ...over,
@@ -96,10 +96,10 @@ describe('areaScore', () => {
   it('is the share of scheduled days done, ignoring an unfinished today', () => {
     const h = habit({ startDate: '2026-11-11' }) // 11, 12, 13 count; 14 pending
     const done = groupDone([
-      { date: '2026-11-11', refId: 'h1', area: 'physical', xp: 10 },
-      { date: '2026-11-13', refId: 'h1', area: 'physical', xp: 10 },
+      { date: '2026-11-11', refId: 'h1', area: 'fitness', xp: 10 },
+      { date: '2026-11-13', refId: 'h1', area: 'fitness', xp: 10 },
     ])
-    expect(areaScore('physical', [h], done, today)).toBe(67)
+    expect(areaScore('fitness', [h], done, today)).toBe(67)
   })
   it('counts challenges dealt in that area alongside habits', () => {
     const days = new Map([
@@ -108,12 +108,12 @@ describe('areaScore', () => {
     ])
     const done = groupDone([{ date: '2026-11-13', refId: 'men-01', area: 'mental', xp: 30 }])
     expect(areaScore('mental', [], done, today, days)).toBe(50)
-    expect(areaScore('physical', [], done, today, days)).toBeNull()
+    expect(areaScore('fitness', [], done, today, days)).toBeNull()
   })
   it('counts today once it is done', () => {
     const h = habit({ startDate: '2026-11-14' })
-    const done = groupDone([{ date: '2026-11-14', refId: 'h1', area: 'physical', xp: 10 }])
-    expect(areaScore('physical', [h], done, today)).toBe(100)
+    const done = groupDone([{ date: '2026-11-14', refId: 'h1', area: 'fitness', xp: 10 }])
+    expect(areaScore('fitness', [h], done, today)).toBe(100)
   })
 })
 
@@ -141,10 +141,10 @@ describe('weeklyXp', () => {
     // 2026-11-14 is a Saturday, so this week began Sunday the 8th.
     const weeks = weeklyXp(
       [
-        { date: '2026-11-08', refId: 'a', area: 'physical', xp: 10 },
-        { date: '2026-11-14', refId: 'a', area: 'physical', xp: 20 },
-        { date: '2026-11-07', refId: 'a', area: 'physical', xp: 5 },
-        { date: '2026-01-01', refId: 'a', area: 'physical', xp: 99 },
+        { date: '2026-11-08', refId: 'a', area: 'fitness', xp: 10 },
+        { date: '2026-11-14', refId: 'a', area: 'fitness', xp: 20 },
+        { date: '2026-11-07', refId: 'a', area: 'fitness', xp: 5 },
+        { date: '2026-01-01', refId: 'a', area: 'fitness', xp: 99 },
       ],
       '2026-11-14',
       2,

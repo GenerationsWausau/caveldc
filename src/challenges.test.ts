@@ -33,9 +33,9 @@ describe('areasForDay', () => {
 
 describe('pickChallenge', () => {
   it('stays in the area and avoids recent ones', () => {
-    const pool = CHALLENGES.filter((c) => c.area === 'financial')
+    const pool = CHALLENGES.filter((c) => c.area === 'relational')
     const avoid = new Set(pool.slice(1).map((c) => c.id))
-    expect(pickChallenge('financial', avoid)).toBe(pool[0])
+    expect(pickChallenge('relational', avoid)).toBe(pool[0])
   })
   it('still returns something when everything was used recently', () => {
     const avoid = new Set(CHALLENGES.map((c) => c.id))

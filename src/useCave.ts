@@ -36,7 +36,8 @@ export function useCave(today: string): CaveState {
       scores[a.id] = areaScore(a.id, hs, doneByHabit, today, days)
       xpByArea[a.id] = 0
     }
-    for (const e of es) xpByArea[e.area] += e.xp
+    // XP from a removed area still counts toward your level, just not toward any area.
+    for (const e of es) if (e.area in xpByArea) xpByArea[e.area] += e.xp
     return {
       ready: allHabits !== undefined && entries !== undefined && dayRows !== undefined,
       habits: hs.filter((h) => !h.archivedOn).sort((a, b) => a.order - b.order),

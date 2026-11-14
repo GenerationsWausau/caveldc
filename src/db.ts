@@ -1,7 +1,13 @@
 // Everything is stored on the device in IndexedDB. No account, no server.
 import Dexie, { type EntityTable } from 'dexie'
 import type { AreaId } from './areas'
-import { areasForDay, pickChallenge, REPEAT_GAP_DAYS, type Challenge } from './challenges'
+import {
+  areasForDay,
+  CHALLENGE_BY_ID,
+  pickChallenge,
+  REPEAT_GAP_DAYS,
+  type Challenge,
+} from './challenges'
 import { addDays, todayKey } from './logic'
 import { DEFAULT_REMINDERS, type Reminder } from './reminders'
 
@@ -92,6 +98,40 @@ class CaveDB extends Dexie {
 }
 
 export const db = new CaveDB()
+
+/**
+ * Brings data from the original five areas up to date. 'physical' was split into
+ * health and fitness: habits filed there become Health (they can be moved by editing),
+ * and challenges follow the library. 'financial' was removed: its habits are retired
+ * and its challenges dropped from the days they were dealt, but XP already earned
+ * there stays in your total. Safe to run any number of times.
+ */
+export async function migrateLegacyAreas() {
+  const legacy = (area: string) => area === 'physical' || area === 'financial'
+  await db.transaction('rw', db.habits, db.entries, db.days, async () => {
+    await db.habits
+      .filter((h) => legacy(h.area))
+      .modify((h) => {
+        if ((h.area as string) === 'physical') h.area = 'health'
+        else if (!h.archivedOn) h.archivedOn = todayKey()
+      })
+    await db.entries
+      .filter((e) => (e.area as string) === 'physical')
+      .modify((e) => {
+        e.area = (e.kind === 'challenge' && CHALLENGE_BY_ID.get(e.refId)?.area) || 'health'
+      })
+    await db.days
+      .filter((d) => d.challenges.some((ch) => legacy(ch.area)))
+      .modify((d) => {
+        d.challenges = d.challenges
+          .filter((ch) => (ch.area as string) !== 'financial')
+          .map((ch) => (legacy(ch.area) ? { ...ch, area: CHALLENGE_BY_ID.get(ch.id)?.area ?? 'health' } : ch))
+      })
+  })
+}
+
+// Runs once each time the database opens, ahead of anything the screens ask for.
+db.on('ready', migrateLegacyAreas, true)
 
 const uid = () => crypto.randomUUID()
 
@@ -293,6 +333,7 @@ export async function restoreBackup(backup: Backup) {
     await db.fuel.bulkAdd(backup.fuel ?? [])
     await db.settings.bulkAdd(backup.settings ?? [])
   })
+  await migrateLegacyAreas()
 }
 
 /** Ask the browser not to clear our data when the phone runs low on space. */
