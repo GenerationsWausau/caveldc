@@ -13,7 +13,7 @@ export function Progress({ cave, today }: { cave: CaveState; today: string }) {
   const cells = Array.from({ length: WEEKS * 7 }, (_, i) => {
     const key = addDays(endOfWeek, i - (WEEKS * 7 - 1))
     const future = key > today
-    return { key, future, ratio: future ? null : dayCompletion(cave.allHabits, cave.doneByHabit, key) }
+    return { key, future, ratio: future ? null : dayCompletion(cave.allHabits, cave.doneByHabit, key, cave.days) }
   })
   const cleanDays = cells.filter((c) => c.ratio === 1).length
 
@@ -60,7 +60,8 @@ export function Progress({ cave, today }: { cave: CaveState; today: string }) {
         })}
       </ul>
       <p className="hint">
-        A score is the share of what you committed to that you actually did. Miss days and it drops.
+        A score is the share of your habits and challenges in that area that you actually did. Miss
+        days and it drops.
       </p>
 
       <div className="section-head">

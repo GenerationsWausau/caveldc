@@ -1,7 +1,8 @@
 // Everything is stored on the device in IndexedDB. No account, no server.
 import Dexie, { type EntityTable } from 'dexie'
 import type { AreaId } from './areas'
-import { todayKey } from './logic'
+import { areasForDay, pickChallenge, REPEAT_GAP_DAYS, type Challenge } from './challenges'
+import { addDays, todayKey } from './logic'
 
 export interface Habit {
   id: string
@@ -25,9 +26,17 @@ export interface Entry {
   at: number
 }
 
+/** The challenges dealt for one date. Stored so they stay put once you've seen them. */
+export interface Day {
+  date: string
+  challenges: Challenge[] // snapshots, so old days survive edits to the library
+  swapped: boolean
+}
+
 class CaveDB extends Dexie {
   habits!: EntityTable<Habit, 'id'>
   entries!: EntityTable<Entry, 'id'>
+  days!: EntityTable<Day, 'date'>
 
   constructor() {
     super('the-cave')
@@ -35,6 +44,7 @@ class CaveDB extends Dexie {
       habits: 'id, area',
       entries: 'id, date, [refId+date]',
     })
+    this.version(2).stores({ days: 'date' })
   }
 }
 
@@ -58,23 +68,62 @@ export async function retireHabit(id: string) {
   await db.habits.update(id, { archivedOn: todayKey() })
 }
 
-export async function toggleHabit(habit: Habit, date: string): Promise<boolean> {
+/** Marks something done for a date, or un-marks it. Returns whether it is now done. */
+async function toggleEntry(
+  kind: Entry['kind'],
+  ref: { id: string; area: AreaId; xp: number },
+  date: string,
+): Promise<boolean> {
   return db.transaction('rw', db.entries, async () => {
-    const existing = await db.entries.where('[refId+date]').equals([habit.id, date]).first()
+    const existing = await db.entries.where('[refId+date]').equals([ref.id, date]).first()
     if (existing) {
       await db.entries.delete(existing.id)
       return false
     }
-    await db.entries.add({
-      id: uid(),
-      date,
-      kind: 'habit',
-      refId: habit.id,
-      area: habit.area,
-      xp: habit.xp,
-      at: Date.now(),
-    })
+    await db.entries.add({ id: uid(), date, kind, refId: ref.id, area: ref.area, xp: ref.xp, at: Date.now() })
     return true
+  })
+}
+
+export const toggleHabit = (habit: Habit, date: string) => toggleEntry('habit', habit, date)
+export const toggleChallenge = (challenge: Challenge, date: string) =>
+  toggleEntry('challenge', challenge, date)
+
+// ---- daily challenges ----
+
+async function recentChallengeIds(date: string): Promise<Set<string>> {
+  const recent = await db.days.where('date').between(addDays(date, -REPEAT_GAP_DAYS), date, true, false).toArray()
+  return new Set(recent.flatMap((d) => d.challenges.map((ch) => ch.id)))
+}
+
+/** Deals the day's challenges the first time the day is opened. Safe to call repeatedly. */
+export async function ensureDay(date: string) {
+  await db.transaction('rw', db.days, async () => {
+    if (await db.days.get(date)) return
+    const avoid = await recentChallengeIds(date)
+    const challenges = areasForDay(date).map((area) => {
+      const pick = pickChallenge(area, avoid)
+      avoid.add(pick.id)
+      return pick
+    })
+    await db.days.add({ date, challenges, swapped: false })
+  })
+}
+
+/** Trades one challenge for another from the same area. One swap per day. */
+export async function swapChallenge(date: string, challengeId: string) {
+  await db.transaction('rw', db.days, db.entries, async () => {
+    const day = await db.days.get(date)
+    if (!day || day.swapped) return
+    const index = day.challenges.findIndex((ch) => ch.id === challengeId)
+    if (index === -1) return
+    const done = await db.entries.where('[refId+date]').equals([challengeId, date]).first()
+    if (done) return
+    const avoid = await recentChallengeIds(date)
+    day.challenges.forEach((ch) => avoid.add(ch.id))
+    const challenges = [...day.challenges]
+    challenges[index] = pickChallenge(day.challenges[index].area, avoid)
+    await db.days.put({ ...day, challenges, swapped: true })
   })
 }
 
@@ -86,11 +135,16 @@ export interface Backup {
   exportedAt: string
   habits: Habit[]
   entries: Entry[]
+  days?: Day[] // absent in backups made before daily challenges existed
 }
 
 export async function exportBackup(): Promise<Backup> {
-  const [habits, entries] = await Promise.all([db.habits.toArray(), db.entries.toArray()])
-  return { app: 'the-cave', version: 1, exportedAt: new Date().toISOString(), habits, entries }
+  const [habits, entries, days] = await Promise.all([
+    db.habits.toArray(),
+    db.entries.toArray(),
+    db.days.toArray(),
+  ])
+  return { app: 'the-cave', version: 1, exportedAt: new Date().toISOString(), habits, entries, days }
 }
 
 export function parseBackup(text: string): Backup {
@@ -109,11 +163,13 @@ export function parseBackup(text: string): Backup {
 
 /** Replaces everything on this device with the backup. */
 export async function restoreBackup(backup: Backup) {
-  await db.transaction('rw', db.habits, db.entries, async () => {
+  await db.transaction('rw', db.habits, db.entries, db.days, async () => {
     await db.habits.clear()
     await db.entries.clear()
+    await db.days.clear()
     await db.habits.bulkAdd(backup.habits)
     await db.entries.bulkAdd(backup.entries)
+    await db.days.bulkAdd(backup.days ?? [])
   })
 }
 

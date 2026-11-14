@@ -1,6 +1,6 @@
 import { BarChart3, Flame, ListChecks, Settings as SettingsIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { requestPersistence } from './db'
+import { ensureDay, requestPersistence } from './db'
 import { todayKey } from './logic'
 import { Habits } from './screens/Habits'
 import { Progress } from './screens/Progress'
@@ -43,6 +43,11 @@ export default function App() {
   useEffect(() => {
     void requestPersistence()
   }, [])
+
+  // Deal today's challenges the first time the app is opened each day.
+  useEffect(() => {
+    void ensureDay(today)
+  }, [today])
 
   useEffect(() => {
     if (!cave.ready) return

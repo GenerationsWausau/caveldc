@@ -17,6 +17,14 @@ export interface EntryLike {
   xp: number
 }
 
+/** The challenges dealt on one date. */
+export interface DayLike {
+  date: string
+  challenges: { id: string; area: AreaId }[]
+}
+
+const NO_DAYS: ReadonlyMap<string, DayLike> = new Map()
+
 // ---- dates (local time, stored as YYYY-MM-DD so they sort as text) ----
 
 export function dateKey(d: Date): string {
@@ -121,48 +129,60 @@ export function levelInfo(totalXp: number): LevelInfo {
 
 export const SCORE_WINDOW_DAYS = 30
 
+/** Ids of everything asked of you on a date: scheduled habits plus that day's challenges. */
+function commitments(
+  habits: HabitLike[],
+  days: ReadonlyMap<string, DayLike>,
+  key: string,
+  area?: AreaId,
+): string[] {
+  const ids: string[] = []
+  for (const h of habits) {
+    if ((!area || h.area === area) && isScheduled(h, key)) ids.push(h.id)
+  }
+  for (const ch of days.get(key)?.challenges ?? []) {
+    if (!area || ch.area === area) ids.push(ch.id)
+  }
+  return ids
+}
+
 /**
- * 0-100: how much of what you committed to in this area you actually did
- * over the last 30 days. Slack off and it drops. Null when nothing was scheduled.
- * Today only counts once it's done, so the score doesn't sag every morning.
+ * 0-100: how much of what was asked of you in this area you actually did over the
+ * last 30 days, habits and challenges alike. Slack off and it drops. Null when
+ * nothing was asked. Today only counts once it's done, so the score doesn't sag
+ * every morning.
  */
 export function areaScore(
   area: AreaId,
   habits: HabitLike[],
-  doneByHabit: Map<string, Set<string>>,
+  doneById: Map<string, Set<string>>,
   today: string,
+  days: ReadonlyMap<string, DayLike> = NO_DAYS,
 ): number | null {
-  let scheduled = 0
+  let asked = 0
   let done = 0
-  for (const h of habits) {
-    if (h.area !== area) continue
-    const set = doneByHabit.get(h.id)
-    for (let i = 0; i < SCORE_WINDOW_DAYS; i++) {
-      const key = addDays(today, -i)
-      if (!isScheduled(h, key)) continue
-      const isDone = set?.has(key) ?? false
+  for (let i = 0; i < SCORE_WINDOW_DAYS; i++) {
+    const key = addDays(today, -i)
+    for (const id of commitments(habits, days, key, area)) {
+      const isDone = doneById.get(id)?.has(key) ?? false
       if (i === 0 && !isDone) continue
-      scheduled++
+      asked++
       if (isDone) done++
     }
   }
-  return scheduled === 0 ? null : Math.round((done / scheduled) * 100)
+  return asked === 0 ? null : Math.round((done / asked) * 100)
 }
 
-/** Share of the day's scheduled habits that got done, 0-1. Null when nothing was scheduled. */
+/** Share of the day's habits and challenges that got done, 0-1. Null when nothing was asked. */
 export function dayCompletion(
   habits: HabitLike[],
-  doneByHabit: Map<string, Set<string>>,
+  doneById: Map<string, Set<string>>,
   key: string,
+  days: ReadonlyMap<string, DayLike> = NO_DAYS,
 ): number | null {
-  let scheduled = 0
-  let done = 0
-  for (const h of habits) {
-    if (!isScheduled(h, key)) continue
-    scheduled++
-    if (doneByHabit.get(h.id)?.has(key)) done++
-  }
-  return scheduled === 0 ? null : done / scheduled
+  const ids = commitments(habits, days, key)
+  if (ids.length === 0) return null
+  return ids.filter((id) => doneById.get(id)?.has(key)).length / ids.length
 }
 
 export function groupDone(entries: EntryLike[]): Map<string, Set<string>> {

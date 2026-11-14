@@ -1,7 +1,8 @@
-import { Check, ChevronLeft, ChevronRight, Flame, Plus } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Flame, Plus, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { AREAS, AREA_BY_ID } from '../areas'
-import { toggleHabit, type Habit } from '../db'
+import type { Challenge } from '../challenges'
+import { swapChallenge, toggleChallenge, toggleHabit, type Habit } from '../db'
 import { addDays, habitStreak, isScheduled, parseKey } from '../logic'
 import type { CaveState } from '../useCave'
 
@@ -17,15 +18,27 @@ export function Today({ cave, today, onAddHabit }: Props) {
   // Lets you step back to tick off a day you forgot to log. Never forward past today.
   const [offset, setOffset] = useState(0)
   const date = addDays(today, -offset)
+  const isToday = offset === 0
   const { level } = cave
 
-  const scheduled = cave.habits.filter((h) => isScheduled(h, date))
-  const isDone = (h: Habit) => cave.doneByHabit.get(h.id)?.has(date) ?? false
-  const doneCount = scheduled.filter(isDone).length
+  const isDone = (id: string) => cave.doneByHabit.get(id)?.has(date) ?? false
 
-  const toggle = async (h: Habit) => {
-    const nowDone = await toggleHabit(h, date)
-    if (nowDone) navigator.vibrate?.(15)
+  const day = cave.days.get(date)
+  const challenges = day?.challenges ?? []
+  const challengesDone = challenges.filter((ch) => isDone(ch.id)).length
+  const canSwap = isToday && day !== undefined && !day.swapped
+
+  const scheduled = cave.habits.filter((h) => isScheduled(h, date))
+  const habitsDone = scheduled.filter((h) => isDone(h.id)).length
+
+  const everything = challenges.length + scheduled.length
+  const cleanDay = everything > 0 && challengesDone + habitsDone === everything
+
+  const tapHabit = async (h: Habit) => {
+    if (await toggleHabit(h, date)) navigator.vibrate?.(15)
+  }
+  const tapChallenge = async (ch: Challenge) => {
+    if (await toggleChallenge(ch, date)) navigator.vibrate?.(15)
   }
 
   return (
@@ -72,18 +85,56 @@ export function Today({ cave, today, onAddHabit }: Props) {
           <ChevronLeft size={20} aria-hidden />
         </button>
         <div className="daybar-label">
-          <strong>{offset === 0 ? 'Today' : offset === 1 ? 'Yesterday' : DAY_FMT.format(parseKey(date))}</strong>
-          {offset === 0 && <span>{DAY_FMT.format(parseKey(date))}</span>}
+          <strong>{isToday ? 'Today' : offset === 1 ? 'Yesterday' : DAY_FMT.format(parseKey(date))}</strong>
+          {isToday && <span>{DAY_FMT.format(parseKey(date))}</span>}
         </div>
-        <button
-          className="icon-btn"
-          aria-label="Next day"
-          disabled={offset === 0}
-          onClick={() => setOffset(offset - 1)}
-        >
+        <button className="icon-btn" aria-label="Next day" disabled={isToday} onClick={() => setOffset(offset - 1)}>
           <ChevronRight size={20} aria-hidden />
         </button>
       </div>
+
+      {challenges.length > 0 && (
+        <>
+          <div className="section-head">
+            <h2>Challenges</h2>
+            <span>
+              {challengesDone} of {challenges.length}
+            </span>
+          </div>
+          <ul className="habit-list">
+            {challenges.map((ch) => {
+              const done = isDone(ch.id)
+              const area = AREA_BY_ID[ch.area]
+              return (
+                <li key={ch.id} className="row" style={{ '--area': area.color } as React.CSSProperties}>
+                  <button className="habit" aria-pressed={done} onClick={() => tapChallenge(ch)}>
+                    <span className="check">{done && <Check size={18} strokeWidth={3} aria-hidden />}</span>
+                    <span className="habit-body">
+                      <span className="habit-name">{ch.text}</span>
+                      <span className="habit-meta">{area.name}</span>
+                    </span>
+                    <span className="habit-xp">+{ch.xp}</span>
+                  </button>
+                  {canSwap && !done && (
+                    <button
+                      className="swap"
+                      aria-label={`Swap this challenge: ${ch.text}`}
+                      onClick={() => swapChallenge(date, ch.id)}
+                    >
+                      <RefreshCw size={18} aria-hidden />
+                    </button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+          {isToday && (
+            <p className="hint">
+              {day?.swapped ? "You've used today's swap." : 'One swap a day. Use it on the one you least want.'}
+            </p>
+          )}
+        </>
+      )}
 
       {cave.habits.length === 0 ? (
         <div className="empty">
@@ -95,30 +146,25 @@ export function Today({ cave, today, onAddHabit }: Props) {
         </div>
       ) : scheduled.length === 0 ? (
         <div className="empty">
-          <h2>Nothing scheduled</h2>
-          <p>No habits are set for this day. Rest, or add one.</p>
+          <h2>No habits scheduled</h2>
+          <p>Nothing on your list is set for this day.</p>
         </div>
       ) : (
         <>
           <div className="section-head">
             <h2>Habits</h2>
             <span>
-              {doneCount} of {scheduled.length}
+              {habitsDone} of {scheduled.length}
             </span>
           </div>
           <ul className="habit-list">
             {scheduled.map((h) => {
-              const done = isDone(h)
+              const done = isDone(h.id)
               const streak = habitStreak(h, cave.doneByHabit.get(h.id) ?? new Set(), today)
               const area = AREA_BY_ID[h.area]
               return (
-                <li key={h.id}>
-                  <button
-                    className="habit"
-                    aria-pressed={done}
-                    style={{ '--area': area.color } as React.CSSProperties}
-                    onClick={() => toggle(h)}
-                  >
+                <li key={h.id} className="row" style={{ '--area': area.color } as React.CSSProperties}>
+                  <button className="habit" aria-pressed={done} onClick={() => tapHabit(h)}>
                     <span className="check">{done && <Check size={18} strokeWidth={3} aria-hidden />}</span>
                     <span className="habit-body">
                       <span className="habit-name">{h.name}</span>
@@ -133,11 +179,10 @@ export function Today({ cave, today, onAddHabit }: Props) {
               )
             })}
           </ul>
-          {doneCount === scheduled.length && (
-            <p className="alldone">Every habit done. That's a clean day.</p>
-          )}
         </>
       )}
+
+      {cleanDay && <p className="alldone">Everything done. That's a clean day.</p>}
     </>
   )
 }

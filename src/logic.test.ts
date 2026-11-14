@@ -98,6 +98,15 @@ describe('areaScore', () => {
     ])
     expect(areaScore('physical', [h], done, today)).toBe(67)
   })
+  it('counts challenges dealt in that area alongside habits', () => {
+    const days = new Map([
+      ['2026-11-13', { date: '2026-11-13', challenges: [{ id: 'men-01', area: 'mental' as const }] }],
+      ['2026-11-12', { date: '2026-11-12', challenges: [{ id: 'men-02', area: 'mental' as const }] }],
+    ])
+    const done = groupDone([{ date: '2026-11-13', refId: 'men-01', area: 'mental', xp: 30 }])
+    expect(areaScore('mental', [], done, today, days)).toBe(50)
+    expect(areaScore('physical', [], done, today, days)).toBeNull()
+  })
   it('counts today once it is done', () => {
     const h = habit({ startDate: '2026-11-14' })
     const done = groupDone([{ date: '2026-11-14', refId: 'h1', area: 'physical', xp: 10 }])
