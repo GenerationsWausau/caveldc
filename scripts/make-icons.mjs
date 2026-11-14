@@ -2,6 +2,7 @@
 // The logo is 3000x1688 with the mark roughly centred; we take a square around it
 // and set it on the app's charcoal so the white bar of the "e" stays visible.
 import { mkdir } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
 const src = process.argv[2]
@@ -9,7 +10,7 @@ if (!src) throw new Error('Pass the path to the logo PNG.')
 
 const BG = '#171412'
 const SQUARE = { left: 618, top: 0, width: 1688, height: 1688 }
-const out = new URL('../public/', import.meta.url).pathname
+const out = fileURLToPath(new URL('../public/', import.meta.url))
 await mkdir(out, { recursive: true })
 
 async function icon(name, size, logoShare) {
