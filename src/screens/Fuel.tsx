@@ -61,19 +61,16 @@ export function Fuel({ today }: { today: string }) {
         <Meter label="Calories" value={calories} target={targets.calories} />
         <Meter label="Protein" value={protein} target={targets.protein} unit="g" />
         <div className="water">
-          <div className="meter-top">
-            <span className="meter-label">Water</span>
-            <span className="meter-value">
-              {water}
-              {targets.water ? ` / ${targets.water}` : ''} glasses
-            </span>
-          </div>
+          <Meter label="Water" value={water} target={targets.water} unit=" oz" />
           <div className="stepper">
-            <button className="btn" aria-label="One less glass" disabled={water === 0} onClick={() => addWater(date, -1)}>
+            <button className="btn" aria-label="Remove 8 ounces" disabled={water === 0} onClick={() => addWater(date, -8)}>
               <Minus size={18} aria-hidden />
             </button>
-            <button className="btn btn-primary" onClick={() => addWater(date, 1)}>
-              <Plus size={18} aria-hidden /> Add a glass
+            <button className="btn btn-primary" onClick={() => addWater(date, 8)}>
+              <Plus size={18} aria-hidden /> 8 oz
+            </button>
+            <button className="btn btn-primary" onClick={() => addWater(date, 16)}>
+              <Plus size={18} aria-hidden /> 16 oz
             </button>
           </div>
         </div>
@@ -274,10 +271,10 @@ function TargetsForm({ targets, onClose }: { targets: Targets; onClose: () => vo
 
   return (
     <Sheet title="Daily targets" onClose={onClose} onSubmit={save}>
-      <p className="sheet-note">Set the numbers you're aiming for each day. Leave any of them empty to skip it.</p>
+      <p className="sheet-note">Set the numbers you're aiming for each day. Water is in ounces. Leave any of them empty to skip it.</p>
       {field('Calories', calories, setCalories, '2200')}
       {field('Protein, grams', protein, setProtein, '160')}
-      {field('Water, glasses', water, setWaterTarget, '8')}
+      {field('Water, ounces', water, setWaterTarget, '64')}
       {error && (
         <p className="form-error" role="alert">
           {error}

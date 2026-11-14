@@ -62,14 +62,14 @@ export interface Meal {
 /** Per-day nutrition extras that aren't meals. */
 export interface FuelDay {
   date: string
-  water: number // glasses
+  water: number // ounces
 }
 
 /** Daily nutrition targets. Any of them can be left unset. */
 export interface Targets {
   calories?: number
   protein?: number
-  water?: number
+  water?: number // ounces
 }
 
 interface Setting {
@@ -130,8 +130,33 @@ export async function migrateLegacyAreas() {
   })
 }
 
+const OZ_PER_GLASS = 8
+const WATER_UNIT_KEY = 'waterUnit'
+
+/**
+ * Water was first counted in glasses. Converts logged water and the water target to
+ * ounces at 8 oz a glass, once, and records that it has been done.
+ */
+export async function migrateWaterToOunces() {
+  await db.transaction('rw', db.fuel, db.settings, async () => {
+    if (await db.settings.get(WATER_UNIT_KEY)) return
+    await db.fuel.toCollection().modify((f) => {
+      f.water *= OZ_PER_GLASS
+    })
+    const targets = (await db.settings.get(TARGETS_KEY))?.value as Targets | undefined
+    if (targets?.water) await db.settings.put({ key: TARGETS_KEY, value: { ...targets, water: targets.water * OZ_PER_GLASS } })
+    await db.settings.put({ key: WATER_UNIT_KEY, value: 'oz' })
+  })
+}
+
+/** Brings data saved by any older version up to date. Safe to run any number of times. */
+async function migrate() {
+  await migrateLegacyAreas()
+  await migrateWaterToOunces()
+}
+
 // Runs once each time the database opens, ahead of anything the screens ask for.
-db.on('ready', migrateLegacyAreas, true)
+db.on('ready', migrate, true)
 
 const uid = () => crypto.randomUUID()
 
@@ -239,7 +264,7 @@ export async function deleteMeal(id: string) {
   await db.meals.delete(id)
 }
 
-/** Adds or removes glasses. Reads and writes in one step so quick taps all count. */
+/** Adds or removes ounces. Reads and writes in one step so quick taps all count. */
 export async function addWater(date: string, delta: number) {
   await db.transaction('rw', db.fuel, async () => {
     const current = (await db.fuel.get(date))?.water ?? 0
@@ -333,7 +358,7 @@ export async function restoreBackup(backup: Backup) {
     await db.fuel.bulkAdd(backup.fuel ?? [])
     await db.settings.bulkAdd(backup.settings ?? [])
   })
-  await migrateLegacyAreas()
+  await migrate()
 }
 
 /** Ask the browser not to clear our data when the phone runs low on space. */
