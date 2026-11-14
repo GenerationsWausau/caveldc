@@ -10,7 +10,10 @@ import {
   type Backup,
 } from '../db'
 import { todayKey } from '../logic'
-import { buildIcs, type Reminder } from '../reminders'
+import { APP_URL, icsPath, snapTime, STEP_MINUTES, type Reminder } from '../reminders'
+
+// True only inside an iPhone or iPad web app opened from the home screen.
+const isIosApp = (navigator as Navigator & { standalone?: boolean }).standalone === true
 
 export function Settings({ onManageHabits }: { onManageHabits: () => void }) {
   const fileInput = useRef<HTMLInputElement>(null)
@@ -23,36 +26,25 @@ export function Settings({ onManageHabits }: { onManageHabits: () => void }) {
   }, [])
 
   const reminders = useLiveQuery(getReminders, []) ?? []
-  const [calendarNote, setCalendarNote] = useState('')
+  const [copied, setCopied] = useState<Reminder['id'] | null>(null)
 
-  const changeReminder = (id: Reminder['id'], change: Partial<Reminder>) => {
-    setCalendarNote('')
-    void saveReminders(reminders.map((r) => (r.id === id ? { ...r, ...change } : r)))
+  const changeTime = (id: Reminder['id'], time: string) => {
+    setCopied(null)
+    void saveReminders(reminders.map((r) => (r.id === id ? { ...r, time: snapTime(time) } : r)))
   }
 
-  // Hands the phone a calendar file. Sharing it is the surest way to reach the calendar
-  // app from an installed web app; a plain download is the fallback.
-  const addToCalendar = async () => {
-    const appUrl = new URL('./', window.location.href).href
-    const file = new File([buildIcs(reminders, appUrl, new Date())], 'the-cave-reminders.ics', {
-      type: 'text/calendar',
-    })
+  const fileUrl = (r: Reminder) => APP_URL + icsPath(r.id, r.time)
+  // An installed iPhone web app has to pass the link to Safari; only Safari offers
+  // "Add to Calendar". Everywhere else the plain link is right.
+  const openUrl = (r: Reminder) => (isIosApp ? fileUrl(r).replace(/^https:/, 'x-safari-https:') : fileUrl(r))
+
+  const copyLink = async (r: Reminder) => {
     try {
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'The Cave reminders' })
-        setCalendarNote('Choose your calendar app to finish adding them.')
-        return
-      }
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return
+      await navigator.clipboard.writeText(fileUrl(r))
+      setCopied(r.id)
+    } catch {
+      setCopied(null)
     }
-    const url = URL.createObjectURL(file)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = file.name
-    a.click()
-    URL.revokeObjectURL(url)
-    setCalendarNote('Open the downloaded file to add the reminders to your calendar.')
   }
 
   const download = async () => {
@@ -113,31 +105,31 @@ export function Settings({ onManageHabits }: { onManageHabits: () => void }) {
         </p>
         {reminders.map((r) => (
           <div key={r.id} className="reminder">
-            <label>
-              <input type="checkbox" checked={r.on} onChange={(e) => changeReminder(r.id, { on: e.target.checked })} />
-              {r.title}
-            </label>
-            <input
-              type="time"
-              aria-label={`${r.title} time`}
-              value={r.time}
-              disabled={!r.on}
-              onChange={(e) => e.target.value && changeReminder(r.id, { time: e.target.value })}
-            />
+            <div className="reminder-top">
+              <span className="reminder-title">{r.title}</span>
+              <input
+                type="time"
+                step={STEP_MINUTES * 60}
+                aria-label={`${r.title} time`}
+                value={r.time}
+                onChange={(e) => e.target.value && changeTime(r.id, e.target.value)}
+              />
+            </div>
             <small>{r.note}</small>
+            <div className="reminder-actions">
+              <a className="btn btn-primary" href={openUrl(r)} target="_blank" rel="noreferrer">
+                <CalendarPlus size={18} aria-hidden /> Add to calendar
+              </a>
+              <button className="btn" onClick={() => copyLink(r)}>
+                {copied === r.id ? 'Copied' : 'Copy link'}
+              </button>
+            </div>
           </div>
         ))}
-        <button className="btn btn-primary btn-block" disabled={!reminders.some((r) => r.on)} onClick={addToCalendar}>
-          <CalendarPlus size={18} aria-hidden /> Add to my calendar
-        </button>
-        {calendarNote && (
-          <p className="form-ok" role="status">
-            {calendarNote}
-          </p>
-        )}
         <p className="hint">
-          Changed a time? Add them again and your calendar updates the same events. To stop a reminder,
-          delete its event in your calendar app.
+          If "Add to calendar" does nothing, tap "Copy link", open Safari or Chrome, and paste it into the
+          address bar. Changed a time? Add it again. To stop a reminder, delete its event in your calendar
+          app.
         </p>
       </div>
 
