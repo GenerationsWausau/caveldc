@@ -465,15 +465,173 @@ button {
 .area-name {
   font-weight: 600;
 }
+.area-row-top {
+  gap: 10px;
+}
+.area-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--area);
+}
 .area-score {
+  min-width: 34px;
+  text-align: right;
   font-family: var(--display);
   font-weight: 700;
   font-size: 20px;
-  color: var(--area);
+  line-height: 1.2;
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
-.area-row .area-score:not(:empty) {
-  line-height: 1.2;
+.spark,
+.spark-empty {
+  flex: none;
+  width: 84px;
+  height: 24px;
+  align-self: center;
+}
+.spark polyline {
+  fill: none;
+  stroke: var(--area);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.spark circle {
+  fill: var(--area);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+/* ---- XP by week ---- */
+.chart-value {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1.1;
+  color: var(--text) !important;
+  font-variant-numeric: tabular-nums;
+}
+.chart-value small {
+  font-family: var(--body);
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.xp-chart {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 120px;
+  border-bottom: 1px solid var(--line);
+}
+.xp-col {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 2px;
+  border-radius: 6px 6px 0 0;
+}
+.xp-bar {
+  width: 100%;
+  max-width: 20px;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: #8a6a3c;
+}
+.xp-col[aria-pressed='true'] {
+  background: var(--surface-2);
+}
+.xp-col[aria-pressed='true'] .xp-bar {
+  background: var(--ochre);
+}
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -6px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* ---- habit table ---- */
+.table-card {
+  padding: 6px 16px;
+}
+.habit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.habit-table th,
+.habit-table td {
+  padding: 10px 0;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+}
+.habit-table tbody tr:last-child th,
+.habit-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.habit-table thead th {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-faint);
+}
+.habit-table th:first-child {
+  text-align: left;
+  width: 52%;
+  padding-right: 8px;
+}
+.habit-table tbody th {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.habit-table td {
+  color: var(--text-dim);
+}
+
+/* ---- reminders ---- */
+.reminder {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 12px;
+}
+.reminder label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--text);
+}
+.reminder input[type='checkbox'] {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--ochre);
+}
+.reminder input[type='time'] {
+  height: 44px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 16px;
+}
+.reminder input[type='time']:disabled {
+  color: var(--text-faint);
+}
+.reminder small {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  color: var(--text-dim);
 }
 .bar {
   height: 8px;

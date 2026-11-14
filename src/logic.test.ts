@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   addDays,
   areaScore,
+  bestStreak,
   dateKey,
   dayStreak,
   groupDone,
+  habitRate,
   habitStreak,
   isScheduled,
   levelInfo,
+  weeklyXp,
   type HabitLike,
 } from './logic'
 
@@ -111,5 +114,44 @@ describe('areaScore', () => {
     const h = habit({ startDate: '2026-11-14' })
     const done = groupDone([{ date: '2026-11-14', refId: 'h1', area: 'physical', xp: 10 }])
     expect(areaScore('physical', [h], done, today)).toBe(100)
+  })
+})
+
+describe('bestStreak', () => {
+  it('finds the longest run, not the current one', () => {
+    const h = habit({ startDate: '2026-11-01' })
+    const done = new Set(['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-06', '2026-11-14'])
+    expect(bestStreak(h, done, '2026-11-14')).toBe(3)
+  })
+  it("doesn't end a run just because today isn't done yet", () => {
+    const h = habit({ startDate: '2026-11-12' })
+    expect(bestStreak(h, new Set(['2026-11-12', '2026-11-13']), '2026-11-14')).toBe(2)
+  })
+})
+
+describe('habitRate', () => {
+  it('is the share of scheduled days done', () => {
+    const h = habit({ startDate: '2026-11-10' }) // 10-13 count, 14 pending
+    expect(habitRate(h, new Set(['2026-11-10', '2026-11-11', '2026-11-12']), '2026-11-14')).toBe(75)
+  })
+})
+
+describe('weeklyXp', () => {
+  it('buckets XP into Sunday-to-Saturday weeks, oldest first', () => {
+    // 2026-11-14 is a Saturday, so this week began Sunday the 8th.
+    const weeks = weeklyXp(
+      [
+        { date: '2026-11-08', refId: 'a', area: 'physical', xp: 10 },
+        { date: '2026-11-14', refId: 'a', area: 'physical', xp: 20 },
+        { date: '2026-11-07', refId: 'a', area: 'physical', xp: 5 },
+        { date: '2026-01-01', refId: 'a', area: 'physical', xp: 99 },
+      ],
+      '2026-11-14',
+      2,
+    )
+    expect(weeks).toEqual([
+      { start: '2026-11-01', end: '2026-11-07', xp: 5 },
+      { start: '2026-11-08', end: '2026-11-14', xp: 30 },
+    ])
   })
 })

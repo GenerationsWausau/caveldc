@@ -3,6 +3,7 @@ import Dexie, { type EntityTable } from 'dexie'
 import type { AreaId } from './areas'
 import { areasForDay, pickChallenge, REPEAT_GAP_DAYS, type Challenge } from './challenges'
 import { addDays, todayKey } from './logic'
+import { DEFAULT_REMINDERS, type Reminder } from './reminders'
 
 export interface Habit {
   id: string
@@ -214,6 +215,16 @@ export async function getTargets(): Promise<Targets> {
 
 export async function saveTargets(targets: Targets) {
   await db.settings.put({ key: TARGETS_KEY, value: targets })
+}
+
+const REMINDERS_KEY = 'reminders'
+
+export async function getReminders(): Promise<Reminder[]> {
+  return ((await db.settings.get(REMINDERS_KEY))?.value as Reminder[] | undefined) ?? DEFAULT_REMINDERS
+}
+
+export async function saveReminders(reminders: Reminder[]) {
+  await db.settings.put({ key: REMINDERS_KEY, value: reminders })
 }
 
 // ---- backup ----

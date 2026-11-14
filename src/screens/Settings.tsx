@@ -1,7 +1,16 @@
-import { ChevronRight, Download, Upload } from 'lucide-react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { CalendarPlus, ChevronRight, Download, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { exportBackup, parseBackup, restoreBackup, type Backup } from '../db'
+import {
+  exportBackup,
+  getReminders,
+  parseBackup,
+  restoreBackup,
+  saveReminders,
+  type Backup,
+} from '../db'
 import { todayKey } from '../logic'
+import { buildIcs, type Reminder } from '../reminders'
 
 export function Settings({ onManageHabits }: { onManageHabits: () => void }) {
   const fileInput = useRef<HTMLInputElement>(null)
@@ -12,6 +21,39 @@ export function Settings({ onManageHabits }: { onManageHabits: () => void }) {
   useEffect(() => {
     navigator.storage?.persisted?.().then(setPersisted)
   }, [])
+
+  const reminders = useLiveQuery(getReminders, []) ?? []
+  const [calendarNote, setCalendarNote] = useState('')
+
+  const changeReminder = (id: Reminder['id'], change: Partial<Reminder>) => {
+    setCalendarNote('')
+    void saveReminders(reminders.map((r) => (r.id === id ? { ...r, ...change } : r)))
+  }
+
+  // Hands the phone a calendar file. Sharing it is the surest way to reach the calendar
+  // app from an installed web app; a plain download is the fallback.
+  const addToCalendar = async () => {
+    const appUrl = new URL('./', window.location.href).href
+    const file = new File([buildIcs(reminders, appUrl, new Date())], 'the-cave-reminders.ics', {
+      type: 'text/calendar',
+    })
+    try {
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'The Cave reminders' })
+        setCalendarNote('Choose your calendar app to finish adding them.')
+        return
+      }
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return
+    }
+    const url = URL.createObjectURL(file)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = file.name
+    a.click()
+    URL.revokeObjectURL(url)
+    setCalendarNote('Open the downloaded file to add the reminders to your calendar.')
+  }
 
   const download = async () => {
     const backup = await exportBackup()
@@ -60,6 +102,44 @@ export function Settings({ onManageHabits }: { onManageHabits: () => void }) {
         </span>
         <ChevronRight size={18} aria-hidden />
       </button>
+
+      <div className="section-head">
+        <h2>Reminders</h2>
+      </div>
+      <div className="card">
+        <p>
+          The Cave can't alert you while it's closed, so reminders go into your phone's calendar as daily
+          repeating alerts that link back here.
+        </p>
+        {reminders.map((r) => (
+          <div key={r.id} className="reminder">
+            <label>
+              <input type="checkbox" checked={r.on} onChange={(e) => changeReminder(r.id, { on: e.target.checked })} />
+              {r.title}
+            </label>
+            <input
+              type="time"
+              aria-label={`${r.title} time`}
+              value={r.time}
+              disabled={!r.on}
+              onChange={(e) => e.target.value && changeReminder(r.id, { time: e.target.value })}
+            />
+            <small>{r.note}</small>
+          </div>
+        ))}
+        <button className="btn btn-primary btn-block" disabled={!reminders.some((r) => r.on)} onClick={addToCalendar}>
+          <CalendarPlus size={18} aria-hidden /> Add to my calendar
+        </button>
+        {calendarNote && (
+          <p className="form-ok" role="status">
+            {calendarNote}
+          </p>
+        )}
+        <p className="hint">
+          Changed a time? Add them again and your calendar updates the same events. To stop a reminder,
+          delete its event in your calendar app.
+        </p>
+      </div>
 
       <div className="section-head">
         <h2>Backup</h2>

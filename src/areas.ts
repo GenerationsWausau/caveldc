@@ -7,12 +7,14 @@ export interface Area {
   color: string
 }
 
+// Checked as a set for colour-blind separation on the app's dark surface. Re-run the
+// palette validator before changing any of them.
 export const AREAS: Area[] = [
   { id: 'physical', name: 'Physical', short: 'Body', color: '#d4574a' },
-  { id: 'mental', name: 'Mental', short: 'Mind', color: '#6b93e6' },
-  { id: 'spiritual', name: 'Spiritual', short: 'Spirit', color: '#e09a35' },
-  { id: 'relational', name: 'Relational', short: 'People', color: '#8fb573' },
-  { id: 'financial', name: 'Financial', short: 'Money', color: '#4fb3a6' },
+  { id: 'mental', name: 'Mental', short: 'Mind', color: '#5b84d6' },
+  { id: 'spiritual', name: 'Spiritual', short: 'Spirit', color: '#c8842a' },
+  { id: 'relational', name: 'Relational', short: 'People', color: '#3f9e7a' },
+  { id: 'financial', name: 'Financial', short: 'Money', color: '#a06ad2' },
 ]
 
 export const AREA_BY_ID = Object.fromEntries(AREAS.map((a) => [a.id, a])) as Record<AreaId, Area>
