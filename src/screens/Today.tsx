@@ -1,20 +1,20 @@
-import { Check, ChevronLeft, ChevronRight, Flame, Plus, RefreshCw } from 'lucide-react'
+import { Check, Flame, Plus, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { AREAS, AREA_BY_ID } from '../areas'
 import type { Challenge } from '../challenges'
+import { DayBar } from '../components/DayBar'
 import { swapChallenge, toggleChallenge, toggleHabit, type Habit } from '../db'
-import { addDays, habitStreak, isScheduled, parseKey } from '../logic'
+import { addDays, habitStreak, isScheduled } from '../logic'
 import type { CaveState } from '../useCave'
-
-const DAY_FMT = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'short', day: 'numeric' })
 
 interface Props {
   cave: CaveState
   today: string
   onAddHabit: () => void
+  onManageHabits: () => void
 }
 
-export function Today({ cave, today, onAddHabit }: Props) {
+export function Today({ cave, today, onAddHabit, onManageHabits }: Props) {
   // Lets you step back to tick off a day you forgot to log. Never forward past today.
   const [offset, setOffset] = useState(0)
   const date = addDays(today, -offset)
@@ -80,18 +80,7 @@ export function Today({ cave, today, onAddHabit }: Props) {
         })}
       </section>
 
-      <div className="daybar">
-        <button className="icon-btn" aria-label="Previous day" onClick={() => setOffset(offset + 1)}>
-          <ChevronLeft size={20} aria-hidden />
-        </button>
-        <div className="daybar-label">
-          <strong>{isToday ? 'Today' : offset === 1 ? 'Yesterday' : DAY_FMT.format(parseKey(date))}</strong>
-          {isToday && <span>{DAY_FMT.format(parseKey(date))}</span>}
-        </div>
-        <button className="icon-btn" aria-label="Next day" disabled={isToday} onClick={() => setOffset(offset - 1)}>
-          <ChevronRight size={20} aria-hidden />
-        </button>
-      </div>
+      <DayBar date={date} offset={offset} onOffset={setOffset} />
 
       {challenges.length > 0 && (
         <>
@@ -148,6 +137,9 @@ export function Today({ cave, today, onAddHabit }: Props) {
         <div className="empty">
           <h2>No habits scheduled</h2>
           <p>Nothing on your list is set for this day.</p>
+          <button className="btn" onClick={onManageHabits}>
+            Edit habits
+          </button>
         </div>
       ) : (
         <>
@@ -155,6 +147,9 @@ export function Today({ cave, today, onAddHabit }: Props) {
             <h2>Habits</h2>
             <span>
               {habitsDone} of {scheduled.length}
+              <button className="link" onClick={onManageHabits}>
+                Edit habits
+              </button>
             </span>
           </div>
           <ul className="habit-list">

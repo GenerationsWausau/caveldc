@@ -1,19 +1,23 @@
-import { BarChart3, Flame, ListChecks, Settings as SettingsIcon } from 'lucide-react'
+import { BarChart3, Flame, NotebookPen, Settings as SettingsIcon, Utensils } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { ensureDay, requestPersistence } from './db'
 import { todayKey } from './logic'
+import { Fuel } from './screens/Fuel'
 import { Habits } from './screens/Habits'
+import { Journal } from './screens/Journal'
 import { Progress } from './screens/Progress'
 import { Settings } from './screens/Settings'
 import { Today } from './screens/Today'
 import { useCave } from './useCave'
 
-type Tab = 'today' | 'progress' | 'habits' | 'settings'
+// 'habits' is a screen reached from Today or Settings, not a tab of its own.
+type Tab = 'today' | 'progress' | 'journal' | 'fuel' | 'settings' | 'habits'
 
 const TABS: { id: Tab; label: string; icon: typeof Flame }[] = [
   { id: 'today', label: 'Today', icon: Flame },
   { id: 'progress', label: 'Progress', icon: BarChart3 },
-  { id: 'habits', label: 'Habits', icon: ListChecks },
+  { id: 'journal', label: 'Journal', icon: NotebookPen },
+  { id: 'fuel', label: 'Fuel', icon: Utensils },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ]
 
@@ -67,10 +71,15 @@ export default function App() {
         {tab === 'today' && <Today cave={cave} today={today} onAddHabit={() => {
               setStartNewHabit(true)
               setTab('habits')
+            }} onManageHabits={() => {
+              setStartNewHabit(false)
+              setTab('habits')
             }} />}
         {tab === 'progress' && <Progress cave={cave} today={today} />}
-        {tab === 'habits' && <Habits cave={cave} startNew={startNewHabit} />}
-        {tab === 'settings' && <Settings />}
+        {tab === 'journal' && <Journal today={today} />}
+        {tab === 'fuel' && <Fuel today={today} />}
+        {tab === 'habits' && <Habits cave={cave} startNew={startNewHabit} onBack={() => setTab('today')} />}
+        {tab === 'settings' && <Settings onManageHabits={() => setTab('habits')} />}
       </main>
 
       <nav className="tabs" aria-label="Main">
@@ -78,7 +87,7 @@ export default function App() {
           <button
             key={id}
             className="tab"
-            aria-current={tab === id ? 'page' : undefined}
+            aria-current={tab === id || (tab === 'habits' && id === 'today') ? 'page' : undefined}
             onClick={() => {
               setStartNewHabit(false)
               setTab(id)

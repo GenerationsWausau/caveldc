@@ -33,10 +33,51 @@ export interface Day {
   swapped: boolean
 }
 
+/** One night's journal: three prompts and a free page. */
+export interface JournalEntry {
+  date: string
+  win: string
+  miss: string
+  tomorrow: string
+  notes: string
+  updatedAt: number
+}
+
+export interface Meal {
+  id: string
+  date: string
+  name: string
+  calories?: number
+  protein?: number
+  at: number
+}
+
+/** Per-day nutrition extras that aren't meals. */
+export interface FuelDay {
+  date: string
+  water: number // glasses
+}
+
+/** Daily nutrition targets. Any of them can be left unset. */
+export interface Targets {
+  calories?: number
+  protein?: number
+  water?: number
+}
+
+interface Setting {
+  key: string
+  value: unknown
+}
+
 class CaveDB extends Dexie {
   habits!: EntityTable<Habit, 'id'>
   entries!: EntityTable<Entry, 'id'>
   days!: EntityTable<Day, 'date'>
+  journal!: EntityTable<JournalEntry, 'date'>
+  meals!: EntityTable<Meal, 'id'>
+  fuel!: EntityTable<FuelDay, 'date'>
+  settings!: EntityTable<Setting, 'key'>
 
   constructor() {
     super('the-cave')
@@ -45,6 +86,7 @@ class CaveDB extends Dexie {
       entries: 'id, date, [refId+date]',
     })
     this.version(2).stores({ days: 'date' })
+    this.version(3).stores({ journal: 'date', meals: 'id, date', fuel: 'date', settings: 'key' })
   }
 }
 
@@ -127,6 +169,53 @@ export async function swapChallenge(date: string, challengeId: string) {
   })
 }
 
+// ---- journal ----
+
+export type JournalDraft = Pick<JournalEntry, 'win' | 'miss' | 'tomorrow' | 'notes'>
+
+/** Saves the night's entry. An entry with nothing written is removed rather than kept blank. */
+export async function saveJournal(date: string, draft: JournalDraft) {
+  const empty = !Object.values(draft).some((text) => text.trim())
+  if (empty) await db.journal.delete(date)
+  else await db.journal.put({ date, ...draft, updatedAt: Date.now() })
+}
+
+// ---- nutrition ----
+
+export type MealDraft = Pick<Meal, 'name' | 'calories' | 'protein'>
+
+export async function addMeal(date: string, draft: MealDraft) {
+  await db.meals.add({ ...draft, id: uid(), date, at: Date.now() })
+}
+
+export async function updateMeal(id: string, draft: MealDraft) {
+  // put, not update: clearing calories or protein has to actually remove the old number.
+  const meal = await db.meals.get(id)
+  if (meal) await db.meals.put({ id, date: meal.date, at: meal.at, ...draft })
+}
+
+export async function deleteMeal(id: string) {
+  await db.meals.delete(id)
+}
+
+/** Adds or removes glasses. Reads and writes in one step so quick taps all count. */
+export async function addWater(date: string, delta: number) {
+  await db.transaction('rw', db.fuel, async () => {
+    const current = (await db.fuel.get(date))?.water ?? 0
+    await db.fuel.put({ date, water: Math.max(0, current + delta) })
+  })
+}
+
+const TARGETS_KEY = 'targets'
+
+export async function getTargets(): Promise<Targets> {
+  return ((await db.settings.get(TARGETS_KEY))?.value as Targets | undefined) ?? {}
+}
+
+export async function saveTargets(targets: Targets) {
+  await db.settings.put({ key: TARGETS_KEY, value: targets })
+}
+
 // ---- backup ----
 
 export interface Backup {
@@ -135,16 +224,36 @@ export interface Backup {
   exportedAt: string
   habits: Habit[]
   entries: Entry[]
-  days?: Day[] // absent in backups made before daily challenges existed
+  // Everything below is absent in backups made before that feature existed.
+  days?: Day[]
+  journal?: JournalEntry[]
+  meals?: Meal[]
+  fuel?: FuelDay[]
+  settings?: Setting[]
 }
 
 export async function exportBackup(): Promise<Backup> {
-  const [habits, entries, days] = await Promise.all([
+  const [habits, entries, days, journal, meals, fuel, settings] = await Promise.all([
     db.habits.toArray(),
     db.entries.toArray(),
     db.days.toArray(),
+    db.journal.toArray(),
+    db.meals.toArray(),
+    db.fuel.toArray(),
+    db.settings.toArray(),
   ])
-  return { app: 'the-cave', version: 1, exportedAt: new Date().toISOString(), habits, entries, days }
+  return {
+    app: 'the-cave',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    habits,
+    entries,
+    days,
+    journal,
+    meals,
+    fuel,
+    settings,
+  }
 }
 
 export function parseBackup(text: string): Backup {
@@ -163,13 +272,15 @@ export function parseBackup(text: string): Backup {
 
 /** Replaces everything on this device with the backup. */
 export async function restoreBackup(backup: Backup) {
-  await db.transaction('rw', db.habits, db.entries, db.days, async () => {
-    await db.habits.clear()
-    await db.entries.clear()
-    await db.days.clear()
+  await db.transaction('rw', db.tables, async () => {
+    await Promise.all(db.tables.map((t) => t.clear()))
     await db.habits.bulkAdd(backup.habits)
     await db.entries.bulkAdd(backup.entries)
     await db.days.bulkAdd(backup.days ?? [])
+    await db.journal.bulkAdd(backup.journal ?? [])
+    await db.meals.bulkAdd(backup.meals ?? [])
+    await db.fuel.bulkAdd(backup.fuel ?? [])
+    await db.settings.bulkAdd(backup.settings ?? [])
   })
 }
 

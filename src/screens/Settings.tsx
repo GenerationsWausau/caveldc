@@ -1,9 +1,9 @@
-import { Download, Upload } from 'lucide-react'
+import { ChevronRight, Download, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { exportBackup, parseBackup, restoreBackup, type Backup } from '../db'
 import { todayKey } from '../logic'
 
-export function Settings() {
+export function Settings({ onManageHabits }: { onManageHabits: () => void }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<Backup | null>(null)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
@@ -51,6 +51,17 @@ export function Settings() {
       </header>
 
       <div className="section-head">
+        <h2>Habits</h2>
+      </div>
+      <button className="habit" onClick={onManageHabits}>
+        <span className="habit-body">
+          <span className="habit-name">Edit your habits</span>
+          <span className="habit-meta">Add, change or retire the habits on your daily list</span>
+        </span>
+        <ChevronRight size={18} aria-hidden />
+      </button>
+
+      <div className="section-head">
         <h2>Backup</h2>
       </div>
       <div className="card">
@@ -70,7 +81,8 @@ export function Settings() {
           <div className="confirm">
             <p>
               This backup from {new Date(pending.exportedAt).toLocaleDateString()} has {pending.habits.length}{' '}
-              habits and {pending.entries.length} completions. Restoring replaces everything on this phone.
+              habits, {pending.entries.length} completions, {pending.journal?.length ?? 0} journal entries and{' '}
+              {pending.meals?.length ?? 0} meals. Restoring replaces everything on this phone.
             </p>
             <div className="confirm-actions">
               <button className="btn" onClick={() => setPending(null)}>

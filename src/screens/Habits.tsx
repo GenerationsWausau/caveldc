@@ -1,4 +1,4 @@
-import { ChevronRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { AREAS } from '../areas'
 import { HabitForm } from '../components/HabitForm'
@@ -15,11 +15,14 @@ function scheduleLabel(days: number[]) {
   return sorted.map((d) => DAY_NAMES[d]).join(', ')
 }
 
-export function Habits({ cave, startNew }: { cave: CaveState; startNew?: boolean }) {
+export function Habits({ cave, startNew, onBack }: { cave: CaveState; startNew?: boolean; onBack: () => void }) {
   const [editing, setEditing] = useState<Habit | 'new' | null>(startNew ? 'new' : null)
 
   return (
     <>
+      <button className="link back" onClick={onBack}>
+        <ChevronLeft size={18} aria-hidden /> Today
+      </button>
       <header className="page-head">
         <h1>Habits</h1>
         <button className="btn btn-primary btn-small" onClick={() => setEditing('new')}>

@@ -577,6 +577,23 @@ button {
   background: var(--bg);
   font-size: 17px;
 }
+.field textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  line-height: 1.45;
+  resize: vertical;
+}
+.field textarea:focus {
+  outline: none;
+  border-color: var(--ochre);
+}
+.field textarea::placeholder,
 .field input::placeholder {
   color: var(--text-faint);
 }
@@ -737,4 +754,93 @@ button {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ---- small text buttons ---- */
+.link {
+  margin-left: 12px;
+  padding: 6px 0;
+  color: var(--ochre);
+  font-size: 14px;
+  font-weight: 600;
+}
+.link.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 4px -4px;
+  min-height: 44px;
+}
+
+/* ---- journal ---- */
+.journal {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 20px;
+}
+.save-status {
+  margin-top: -8px;
+  font-size: 13px;
+  color: var(--text-faint);
+  text-align: right;
+}
+.entry {
+  min-height: 0;
+  padding: 12px 14px;
+  border-left-color: var(--line);
+}
+.entry-preview {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* ---- fuel ---- */
+.totals {
+  gap: 16px;
+  margin-top: 20px;
+}
+.meter-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.meter-label {
+  font-weight: 600;
+  color: var(--text);
+}
+.meter-value {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 18px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.meter-fill {
+  background: var(--ochre);
+}
+.stepper {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.btn:disabled {
+  color: var(--text-faint);
+}
+.meal {
+  border-left-color: var(--line);
+  color: var(--text-faint);
+}
+.add-meal {
+  margin-top: 10px;
+}
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.sheet-note {
+  color: var(--text-dim);
+  font-size: 14px;
 }
