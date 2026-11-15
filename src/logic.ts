@@ -129,9 +129,15 @@ export function levelInfo(totalXp: number): LevelInfo {
 
 export const SCORE_WINDOW_DAYS = 30
 
-/** Ids of everything asked of you on a date: scheduled habits plus that day's challenges. */
-function commitments(
+/**
+ * Ids of what counts toward a date's score: every scheduled habit, plus any challenge
+ * from that day that was completed. Habits are commitments, so missing one costs you.
+ * Challenges are extra credit: a finished one counts in your favour and a skipped one
+ * is simply left out, so it can never pull a score down.
+ */
+function counted(
   habits: HabitLike[],
+  doneById: Map<string, Set<string>>,
   days: ReadonlyMap<string, DayLike>,
   key: string,
   area?: AreaId,
@@ -141,16 +147,16 @@ function commitments(
     if ((!area || h.area === area) && isScheduled(h, key)) ids.push(h.id)
   }
   for (const ch of days.get(key)?.challenges ?? []) {
-    if (!area || ch.area === area) ids.push(ch.id)
+    if ((!area || ch.area === area) && doneById.get(ch.id)?.has(key)) ids.push(ch.id)
   }
   return ids
 }
 
 /**
- * 0-100: how much of what was asked of you in this area you actually did over the
- * last 30 days, habits and challenges alike. Slack off and it drops. Null when
- * nothing was asked. Today only counts once it's done, so the score doesn't sag
- * every morning.
+ * 0-100 for an area over the last 30 days: the share of your scheduled habits you
+ * did, lifted by any challenges you completed. Miss habits and it drops; skipping a
+ * challenge costs nothing. Null when there is nothing to count. Today's habits only
+ * count once done, so the score doesn't sag every morning.
  */
 export function areaScore(
   area: AreaId,
@@ -163,7 +169,7 @@ export function areaScore(
   let done = 0
   for (let i = 0; i < SCORE_WINDOW_DAYS; i++) {
     const key = addDays(today, -i)
-    for (const id of commitments(habits, days, key, area)) {
+    for (const id of counted(habits, doneById, days, key, area)) {
       const isDone = doneById.get(id)?.has(key) ?? false
       if (i === 0 && !isDone) continue
       asked++
@@ -173,14 +179,14 @@ export function areaScore(
   return asked === 0 ? null : Math.round((done / asked) * 100)
 }
 
-/** Share of the day's habits and challenges that got done, 0-1. Null when nothing was asked. */
+/** How complete a day was, 0-1, by the same rule as the scores. Null when nothing counted. */
 export function dayCompletion(
   habits: HabitLike[],
   doneById: Map<string, Set<string>>,
   key: string,
   days: ReadonlyMap<string, DayLike> = NO_DAYS,
 ): number | null {
-  const ids = commitments(habits, days, key)
+  const ids = counted(habits, doneById, days, key)
   if (ids.length === 0) return null
   return ids.filter((id) => doneById.get(id)?.has(key)).length / ids.length
 }

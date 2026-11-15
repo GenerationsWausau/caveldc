@@ -31,8 +31,8 @@ export function Today({ cave, today, onAddHabit, onManageHabits }: Props) {
   const scheduled = cave.habits.filter((h) => isScheduled(h, date))
   const habitsDone = scheduled.filter((h) => isDone(h.id)).length
 
-  const everything = challenges.length + scheduled.length
-  const cleanDay = everything > 0 && challengesDone + habitsDone === everything
+  // Challenges are extra credit, so a clean day is about your habits alone.
+  const cleanDay = scheduled.length > 0 && habitsDone === scheduled.length
 
   const tapHabit = async (h: Habit) => {
     if (await toggleHabit(h, date)) navigator.vibrate?.(15)
@@ -177,7 +177,7 @@ export function Today({ cave, today, onAddHabit, onManageHabits }: Props) {
         </>
       )}
 
-      {cleanDay && <p className="alldone">Everything done. That's a clean day.</p>}
+      {cleanDay && <p className="alldone">Every habit done. That's a clean day.</p>}
     </>
   )
 }

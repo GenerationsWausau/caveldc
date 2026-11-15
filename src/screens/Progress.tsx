@@ -115,8 +115,8 @@ export function Progress({ cave, today }: { cave: CaveState; today: string }) {
         })}
       </ul>
       <p className="hint">
-        A score is the share of your habits and challenges in that area that you actually did over the last
-        30 days. Miss days and it drops.
+        A score is the share of your habits in that area that you did over the last 30 days. Missing a
+        habit lowers it. Completing a challenge raises it, and skipping one costs nothing.
       </p>
 
       {cave.habits.length > 0 && (

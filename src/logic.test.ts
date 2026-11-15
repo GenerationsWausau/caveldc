@@ -101,13 +101,30 @@ describe('areaScore', () => {
     ])
     expect(areaScore('fitness', [h], done, today)).toBe(67)
   })
-  it('counts challenges dealt in that area alongside habits', () => {
+  it('lets a completed challenge raise a score but never lets a skipped one lower it', () => {
+    const h = habit({ area: 'mental', startDate: '2026-11-12' }) // 12 and 13 count; done on the 12th only
+    const days = new Map([
+      ['2026-11-13', { date: '2026-11-13', challenges: [{ id: 'men-01', area: 'mental' as const }] }],
+      ['2026-11-12', { date: '2026-11-12', challenges: [{ id: 'men-02', area: 'mental' as const }] }],
+    ])
+    const habitOnly = groupDone([{ date: '2026-11-12', refId: 'h1', area: 'mental', xp: 20 }])
+    // Both challenges skipped: same as having no challenges at all.
+    expect(areaScore('mental', [h], habitOnly, today, days)).toBe(50)
+    expect(areaScore('mental', [h], habitOnly, today)).toBe(50)
+    // One challenge done: 2 of 3 counted items.
+    const withChallenge = groupDone([
+      { date: '2026-11-12', refId: 'h1', area: 'mental', xp: 20 },
+      { date: '2026-11-13', refId: 'men-01', area: 'mental', xp: 30 },
+    ])
+    expect(areaScore('mental', [h], withChallenge, today, days)).toBe(67)
+  })
+  it('gives an area a score from completed challenges alone', () => {
     const days = new Map([
       ['2026-11-13', { date: '2026-11-13', challenges: [{ id: 'men-01', area: 'mental' as const }] }],
       ['2026-11-12', { date: '2026-11-12', challenges: [{ id: 'men-02', area: 'mental' as const }] }],
     ])
     const done = groupDone([{ date: '2026-11-13', refId: 'men-01', area: 'mental', xp: 30 }])
-    expect(areaScore('mental', [], done, today, days)).toBe(50)
+    expect(areaScore('mental', [], done, today, days)).toBe(100)
     expect(areaScore('fitness', [], done, today, days)).toBeNull()
   })
   it('counts today once it is done', () => {
