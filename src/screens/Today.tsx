@@ -1,8 +1,8 @@
-import { Check, Flame, Plus, RefreshCw } from 'lucide-react'
+import { Check, Flame, Plus, RefreshCw, TentTree } from 'lucide-react'
 import { useState } from 'react'
 import { AREAS, areaOf } from '../areas'
 import type { Challenge } from '../challenges'
-import { DayBar } from '../components/DayBar'
+import { DayBar, formatDay } from '../components/DayBar'
 import { swapChallenge, toggleChallenge, toggleHabit, type Habit } from '../db'
 import { addDays, habitStreak, isScheduled } from '../logic'
 import type { CaveState } from '../useCave'
@@ -22,6 +22,8 @@ export function Today({ cave, today, onAddHabit, onManageHabits }: Props) {
   const { level } = cave
 
   const isDone = (id: string) => cave.doneByHabit.get(id)?.has(date) ?? false
+  // On a vacation day you can still check things off, but nothing earns or costs anything.
+  const onVacation = cave.paused(date)
 
   const day = cave.days.get(date)
   const challenges = day?.challenges ?? []
@@ -82,6 +84,19 @@ export function Today({ cave, today, onAddHabit, onManageHabits }: Props) {
 
       <DayBar date={date} offset={offset} onOffset={setOffset} />
 
+      {onVacation && (
+        <div className="vacation-banner" role="status">
+          <TentTree size={22} aria-hidden />
+          <div>
+            <strong>{isToday ? 'Vacation mode' : 'Vacation day'}</strong>
+            <p>
+              {isToday && cave.vacation ? `Progress is paused through ${formatDay(cave.vacation.end)}. ` : 'Progress was paused. '}
+              Check off what you can. Nothing earns XP, and nothing missed counts against you.
+            </p>
+          </div>
+        </div>
+      )}
+
       {challenges.length > 0 && (
         <>
           <div className="section-head">
@@ -102,7 +117,7 @@ export function Today({ cave, today, onAddHabit, onManageHabits }: Props) {
                       <span className="habit-name">{ch.text}</span>
                       <span className="habit-meta">{area.name}</span>
                     </span>
-                    <span className="habit-xp">+{ch.xp}</span>
+                    <span className="habit-xp">{onVacation ? '' : `+${ch.xp}`}</span>
                   </button>
                   {canSwap && !done && (
                     <button
@@ -155,7 +170,7 @@ export function Today({ cave, today, onAddHabit, onManageHabits }: Props) {
           <ul className="habit-list">
             {scheduled.map((h) => {
               const done = isDone(h.id)
-              const streak = habitStreak(h, cave.doneByHabit.get(h.id) ?? new Set(), today)
+              const streak = habitStreak(h, cave.doneByHabit.get(h.id) ?? new Set(), today, cave.paused)
               const area = areaOf(h.area)
               return (
                 <li key={h.id} className="row" style={{ '--area': area.color } as React.CSSProperties}>
@@ -168,7 +183,7 @@ export function Today({ cave, today, onAddHabit, onManageHabits }: Props) {
                         {streak > 0 && ` · ${streak} day${streak === 1 ? '' : 's'}`}
                       </span>
                     </span>
-                    <span className="habit-xp">+{h.xp}</span>
+                    <span className="habit-xp">{onVacation ? '' : `+${h.xp}`}</span>
                   </button>
                 </li>
               )

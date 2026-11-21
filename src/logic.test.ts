@@ -10,6 +10,7 @@ import {
   habitStreak,
   isScheduled,
   levelInfo,
+  pausedBy,
   weeklyXp,
   type HabitLike,
 } from './logic'
@@ -170,5 +171,35 @@ describe('weeklyXp', () => {
       { start: '2026-11-01', end: '2026-11-07', xp: 5 },
       { start: '2026-11-08', end: '2026-11-14', xp: 30 },
     ])
+  })
+})
+
+describe('vacation', () => {
+  const today = '2026-11-14'
+  const paused = pausedBy([{ start: '2026-11-10', end: '2026-11-14' }])
+
+  it('freezes a habit streak instead of breaking or growing it', () => {
+    const h = habit({ startDate: '2026-11-01' })
+    const done = new Set(['2026-11-07', '2026-11-08', '2026-11-09', '2026-11-12'])
+    expect(habitStreak(h, done, today, paused)).toBe(3)
+    expect(bestStreak(h, done, today, paused)).toBe(3)
+  })
+  it('freezes the day streak', () => {
+    expect(dayStreak(new Set(['2026-11-08', '2026-11-09']), today, paused)).toBe(2)
+    expect(dayStreak(new Set(['2026-11-08', '2026-11-09']), today)).toBe(0)
+  })
+  it('holds an area score exactly where it was when the vacation began', () => {
+    const h = habit({ startDate: '2026-09-01' })
+    const done = new Set<string>()
+    for (let key = '2026-09-01'; key <= '2026-11-09'; key = addDays(key, 1)) {
+      if (Number(key.slice(8)) % 4 !== 0) done.add(key)
+    }
+    const doneById = new Map([['h1', done]])
+    const before = areaScore('fitness', [h], doneById, '2026-11-09')
+    expect(before).not.toBeNull()
+    // Five days missed on vacation: no change.
+    expect(areaScore('fitness', [h], doneById, today, undefined, paused)).toBe(before)
+    // Without vacation those misses would have pulled it down.
+    expect(areaScore('fitness', [h], doneById, today)).toBeLessThan(before!)
   })
 })

@@ -8,7 +8,7 @@ import {
   REPEAT_GAP_DAYS,
   type Challenge,
 } from './challenges'
-import { addDays, todayKey } from './logic'
+import { addDays, todayKey, type Vacation } from './logic'
 import { DEFAULT_REMINDERS, type Reminder } from './reminders'
 
 export interface Habit {
@@ -290,6 +290,37 @@ export async function getReminders(): Promise<Reminder[]> {
 
 export async function saveReminders(reminders: Reminder[]) {
   await db.settings.put({ key: REMINDERS_KEY, value: reminders })
+}
+
+// ---- vacation ----
+
+const VACATIONS_KEY = 'vacations'
+
+/** Every vacation ever taken, kept so past vacation days stay paused for good. */
+export async function getVacations(): Promise<Vacation[]> {
+  return ((await db.settings.get(VACATIONS_KEY))?.value as Vacation[] | undefined) ?? []
+}
+
+async function saveVacations(vacations: Vacation[]) {
+  const sorted = [...vacations].sort((a, b) => a.start.localeCompare(b.start))
+  await db.settings.put({ key: VACATIONS_KEY, value: sorted })
+}
+
+export async function scheduleVacation(vacation: Vacation) {
+  await saveVacations([...(await getVacations()), vacation])
+}
+
+/** Removes a vacation that hasn't started yet. */
+export async function cancelVacation(vacation: Vacation) {
+  await saveVacations((await getVacations()).filter((v) => v.start !== vacation.start))
+}
+
+/** Ends a vacation under way so today is a normal day again. */
+export async function endVacationNow(vacation: Vacation, today: string) {
+  const others = (await getVacations()).filter((v) => v.start !== vacation.start)
+  // Started today: nothing was paused yet, so it simply goes away.
+  if (vacation.start >= today) await saveVacations(others)
+  else await saveVacations([...others, { start: vacation.start, end: addDays(today, -1) }])
 }
 
 // ---- backup ----

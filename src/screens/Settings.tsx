@@ -9,6 +9,7 @@ import {
   saveReminders,
   type Backup,
 } from '../db'
+import { VacationCard } from '../components/VacationCard'
 import { todayKey } from '../logic'
 import { APP_URL, icsPath, snapTime, STEP_MINUTES, type Reminder } from '../reminders'
 
@@ -94,6 +95,11 @@ export function Settings({ onManageHabits }: { onManageHabits: () => void }) {
         </span>
         <ChevronRight size={18} aria-hidden />
       </button>
+
+      <div className="section-head">
+        <h2>Vacation</h2>
+      </div>
+      <VacationCard />
 
       <div className="section-head">
         <h2>Reminders</h2>

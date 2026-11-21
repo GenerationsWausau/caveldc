@@ -22,7 +22,7 @@ const NO_DATES: Set<string> = new Set()
 export function Progress({ cave, today }: { cave: CaveState; today: string }) {
   const { level } = cave
 
-  const weeks = weeklyXp(cave.entries, today, XP_WEEKS)
+  const weeks = weeklyXp(cave.creditedEntries, today, XP_WEEKS)
   const maxXp = Math.max(1, ...weeks.map((w) => w.xp))
   const [pickedWeek, setPickedWeek] = useState(XP_WEEKS - 1)
   const picked = weeks[pickedWeek]
@@ -32,7 +32,9 @@ export function Progress({ cave, today }: { cave: CaveState; today: string }) {
   const cells = Array.from({ length: CALENDAR_WEEKS * 7 }, (_, i) => {
     const key = addDays(endOfWeek, i - (CALENDAR_WEEKS * 7 - 1))
     const future = key > today
-    return { key, future, ratio: future ? null : dayCompletion(cave.allHabits, cave.doneByHabit, key, cave.days) }
+    const vacation = cave.paused(key)
+    const ratio = future || vacation ? null : dayCompletion(cave.allHabits, cave.doneByHabit, key, cave.days)
+    return { key, future, vacation, ratio }
   })
   const cleanDays = cells.filter((c) => c.ratio === 1).length
 
@@ -93,7 +95,7 @@ export function Progress({ cave, today }: { cave: CaveState; today: string }) {
       <ul className="area-list">
         {AREAS.map((a) => {
           const score = cave.scores[a.id]
-          const trend = scoreTrend(a.id, cave.allHabits, cave.doneByHabit, today, cave.days, TREND_WEEKS)
+          const trend = scoreTrend(a.id, cave.allHabits, cave.doneByHabit, today, cave.days, TREND_WEEKS, cave.paused)
           return (
             <li key={a.id} className="area-row" style={{ '--area': a.color } as React.CSSProperties}>
               <div className="area-row-top">
@@ -138,13 +140,13 @@ export function Progress({ cave, today }: { cave: CaveState; today: string }) {
               <tbody>
                 {cave.habits.map((h) => {
                   const done = cave.doneByHabit.get(h.id) ?? NO_DATES
-                  const rate = habitRate(h, done, today)
+                  const rate = habitRate(h, done, today, cave.paused)
                   return (
                     <tr key={h.id}>
                       <th scope="row">{h.name}</th>
                       <td>{rate === null ? '–' : `${rate}%`}</td>
-                      <td>{habitStreak(h, done, today)}</td>
-                      <td>{bestStreak(h, done, today)}</td>
+                      <td>{habitStreak(h, done, today, cave.paused)}</td>
+                      <td>{bestStreak(h, done, today, cave.paused)}</td>
                     </tr>
                   )
                 })}
@@ -169,11 +171,12 @@ export function Progress({ cave, today }: { cave: CaveState; today: string }) {
         {cells.map((c) => (
           <span
             key={c.key}
-            className={`heat-cell${c.key === today ? ' is-today' : ''}${c.future ? ' is-future' : ''}`}
+            className={`heat-cell${c.key === today ? ' is-today' : ''}${c.future ? ' is-future' : ''}${c.vacation ? ' is-vacation' : ''}`}
             style={c.ratio ? { background: `rgba(224, 154, 53, ${0.2 + c.ratio * 0.8})` } : undefined}
           />
         ))}
       </div>
+      {cells.some((c) => c.vacation) && <p className="hint">Outlined days were vacation: paused, so they don't count.</p>}
     </>
   )
 }

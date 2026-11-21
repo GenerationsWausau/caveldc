@@ -25,6 +25,35 @@ export interface DayLike {
 
 const NO_DAYS: ReadonlyMap<string, DayLike> = new Map()
 
+// ---- vacation ----
+
+/** A stretch of days, start and end both included, when progress is paused. */
+export interface Vacation {
+  start: string
+  end: string
+}
+
+/**
+ * Whether a date is paused. On a paused day nothing earns XP and nothing counts for or
+ * against you: streaks and scores skip over it as if it weren't on the calendar.
+ */
+export type Paused = (key: string) => boolean
+
+export const NEVER_PAUSED: Paused = () => false
+
+export function pausedBy(vacations: Vacation[]): Paused {
+  if (vacations.length === 0) return NEVER_PAUSED
+  return (key) => vacations.some((v) => key >= v.start && key <= v.end)
+}
+
+/** The vacation that is under way or still to come, if any. Only one at a time. */
+export function currentVacation(vacations: Vacation[], today: string): Vacation | undefined {
+  return vacations.find((v) => v.end >= today)
+}
+
+/** Far enough back to step over any vacation when looking for days that count. */
+const LOOKBACK_LIMIT_DAYS = 400
+
 // ---- dates (local time, stored as YYYY-MM-DD so they sort as text) ----
 
 export function dateKey(d: Date): string {
@@ -58,13 +87,16 @@ export function isScheduled(h: HabitLike, key: string): boolean {
 
 // ---- streaks ----
 
-/** Consecutive scheduled days completed. Today not being done yet doesn't break it. */
-export function habitStreak(h: HabitLike, done: Set<string>, today: string): number {
+/**
+ * Consecutive scheduled days completed. Today not being done yet doesn't break it, and
+ * paused days are stepped over without adding to it or breaking it.
+ */
+export function habitStreak(h: HabitLike, done: Set<string>, today: string, paused: Paused = NEVER_PAUSED): number {
   let streak = 0
   let key = today
   if (isScheduled(h, key) && !done.has(key)) key = addDays(key, -1)
   while (key >= h.startDate) {
-    if (isScheduled(h, key)) {
+    if (isScheduled(h, key) && !paused(key)) {
       if (!done.has(key)) break
       streak++
     }
@@ -73,13 +105,15 @@ export function habitStreak(h: HabitLike, done: Set<string>, today: string): num
   return streak
 }
 
-/** Consecutive days with at least one thing completed. */
-export function dayStreak(activeDays: Set<string>, today: string): number {
-  let key = activeDays.has(today) ? today : addDays(today, -1)
+/** Consecutive days with at least one thing completed. Paused days are stepped over. */
+export function dayStreak(activeDays: Set<string>, today: string, paused: Paused = NEVER_PAUSED): number {
+  let key = today
+  if (!paused(key) && !activeDays.has(key)) key = addDays(key, -1)
   let streak = 0
-  while (activeDays.has(key)) {
+  for (let i = 0; i < LOOKBACK_LIMIT_DAYS; i++, key = addDays(key, -1)) {
+    if (paused(key)) continue
+    if (!activeDays.has(key)) break
     streak++
-    key = addDays(key, -1)
   }
   return streak
 }
@@ -157,6 +191,9 @@ function counted(
  * did, lifted by any challenges you completed. Miss habits and it drops; skipping a
  * challenge costs nothing. Null when there is nothing to count. Today's habits only
  * count once done, so the score doesn't sag every morning.
+ *
+ * The 30 days are 30 days that weren't paused, so a vacation holds the score exactly
+ * where it was instead of letting old days drift out of the window.
  */
 export function areaScore(
   area: AreaId,
@@ -164,11 +201,11 @@ export function areaScore(
   doneById: Map<string, Set<string>>,
   today: string,
   days: ReadonlyMap<string, DayLike> = NO_DAYS,
+  paused: Paused = NEVER_PAUSED,
 ): number | null {
   let asked = 0
   let done = 0
-  for (let i = 0; i < SCORE_WINDOW_DAYS; i++) {
-    const key = addDays(today, -i)
+  for (const [i, key] of countedDays(today, paused)) {
     for (const id of counted(habits, doneById, days, key, area)) {
       const isDone = doneById.get(id)?.has(key) ?? false
       if (i === 0 && !isDone) continue
@@ -177,6 +214,16 @@ export function areaScore(
     }
   }
   return asked === 0 ? null : Math.round((done / asked) * 100)
+}
+
+/** The last 30 unpaused dates, newest first, each with how many days back it is. */
+function countedDays(today: string, paused: Paused): [number, string][] {
+  const out: [number, string][] = []
+  for (let i = 0; i < LOOKBACK_LIMIT_DAYS && out.length < SCORE_WINDOW_DAYS; i++) {
+    const key = addDays(today, -i)
+    if (!paused(key)) out.push([i, key])
+  }
+  return out
 }
 
 /** How complete a day was, 0-1, by the same rule as the scores. Null when nothing counted. */
@@ -203,25 +250,24 @@ export function groupDone(entries: EntryLike[]): Map<string, Set<string>> {
 
 // ---- history for the charts ----
 
-/** Longest run of scheduled days completed, ever. */
-export function bestStreak(h: HabitLike, done: Set<string>, today: string): number {
+/** Longest run of scheduled days completed, ever, stepping over paused days. */
+export function bestStreak(h: HabitLike, done: Set<string>, today: string, paused: Paused = NEVER_PAUSED): number {
   let best = 0
   let run = 0
   const end = h.archivedOn && h.archivedOn < today ? h.archivedOn : today
   for (let key = h.startDate; key <= end; key = addDays(key, 1)) {
-    if (!isScheduled(h, key)) continue
+    if (!isScheduled(h, key) || paused(key)) continue
     if (done.has(key)) best = Math.max(best, ++run)
     else if (key !== today) run = 0
   }
   return best
 }
 
-/** 0-100: share of a habit's scheduled days done in the last 30. Null if none were scheduled. */
-export function habitRate(h: HabitLike, done: Set<string>, today: string): number | null {
+/** 0-100: share of a habit's scheduled days done in the last 30 unpaused. Null if none were scheduled. */
+export function habitRate(h: HabitLike, done: Set<string>, today: string, paused: Paused = NEVER_PAUSED): number | null {
   let asked = 0
   let hit = 0
-  for (let i = 0; i < SCORE_WINDOW_DAYS; i++) {
-    const key = addDays(today, -i)
+  for (const [i, key] of countedDays(today, paused)) {
     if (!isScheduled(h, key)) continue
     const isDone = done.has(key)
     if (i === 0 && !isDone) continue
@@ -260,8 +306,9 @@ export function scoreTrend(
   today: string,
   days: ReadonlyMap<string, DayLike>,
   weeks: number,
+  paused: Paused = NEVER_PAUSED,
 ): (number | null)[] {
   return Array.from({ length: weeks }, (_, i) =>
-    areaScore(area, habits, doneById, addDays(today, -7 * (weeks - 1 - i)), days),
+    areaScore(area, habits, doneById, addDays(today, -7 * (weeks - 1 - i)), days, paused),
   )
 }
